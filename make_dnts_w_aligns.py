@@ -29,20 +29,27 @@ def load_pickle(filename):
             except EOFError:
                 break
 
+def are_sentences_same(sentence1, sentence2):
+    words1 = set(sentence1.split())
+    words2 = set(sentence2)
+    return words1 == words2
+
+
 def find_subsequence_indexes(sentence, subsequence):
     indexes = []
     sub_len = len(subsequence)
 
-    # Itera attraverso la frase per trovare le sottosequenze corrispondenti
+    # Iterate through the sentence to find matching subsequences
     for i in range(len(sentence) - sub_len + 1):
-        if set(subsequence).issubset(set(sentence[i:i + sub_len])):
+        sub_sentence = ' '.join(sentence[i:i + sub_len])
+        if are_sentences_same(sub_sentence, subsequence):
             indexes.append(list(range(i, i + sub_len)))
 
     if indexes:
-        return indexes  # Restituisce gli indici delle sottosequenze trovate
+        return indexes  # Return the indexes of the found subsequences
     else:
-        return False  # Se non vengono trovate sottosequenze, restituisce False
-
+        return False  # If no subsequences are found, return False
+    
 def compare_lists_length(list1, list2):
     if len(list1) >= 4 * len(list2) or len(list2) >= 4 * len(list1):
         return True

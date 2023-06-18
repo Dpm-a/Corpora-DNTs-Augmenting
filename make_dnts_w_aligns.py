@@ -55,6 +55,25 @@ def compare_lists_length(list1, list2):
         return True
     else:
         return False
+    
+def get_string_type(string):
+    # Remove whitespace from the string
+    string = string.strip()
+
+    # Check if the string contains only digits
+    if re.match(r'^\d+$', string):
+        return "Numeric"
+
+    # Check if the string contains only letters
+    if re.match(r'^[a-zA-Z]+$', string):
+        return "Alphabetic"
+
+    # Check if the string contains only symbols/punctuation marks
+    if re.match(r'^[^\w\s]+$', string):
+        return "Symbols/Punctuation"
+
+    # If none of the above conditions are met, it can be a combination of types
+    return "Combination"
 
 def modify_lastly_occurences(src, trg, trg_sentence, admitted_tags, to_sample):
     trg_word_idx_dic = {unidecode(word.lower()) : idx for idx , (word, _) in enumerate(trg_sentence)}
@@ -164,6 +183,8 @@ def replace_entities_no_align(src_sentence, trg_sentence, to_sample, verbosity: 
 
                 if len(idxs) > 1:
                     for lst in idxs:
+                        if not lst:
+                            continue
                         to_delete_s = lst[0]
                         res_src[to_delete_s] = (pop, "ENTITY")
                         if len(lst) > 1:
@@ -176,6 +197,8 @@ def replace_entities_no_align(src_sentence, trg_sentence, to_sample, verbosity: 
 
                 if (len(trg_indexes)) > 1:
                     for lst in trg_indexes:
+                        if not lst:
+                            continue
                         to_delete_t = lst[0]
                         res_trg[to_delete_t] = (pop, "ENTITY")
                         if len(lst) > 1:
@@ -219,6 +242,8 @@ def replace_entities_no_align(src_sentence, trg_sentence, to_sample, verbosity: 
 
                 if len(idxs) > 1:
                     for lst in idxs:
+                        if not lst:
+                            continue
                         to_delete_t = lst[0]
                         res_trg[to_delete_t] = (pop, "ENTITY")
                         if len(lst) > 1:
@@ -231,6 +256,8 @@ def replace_entities_no_align(src_sentence, trg_sentence, to_sample, verbosity: 
 
                 if (len(src_indexes)) > 1:
                     for lst in src_indexes:
+                        if not lst:
+                            continue
                         to_delete_s = lst[0]
                         res_src[to_delete_s] = (pop, "ENTITY")
                         if len(lst) > 1:
@@ -312,8 +339,9 @@ def replace_multiple(idx, src, trg, src_tag, src_entity_list, entity_words_idx, 
                         break
                 
                 new_word_trg = " ".join(el for el in trg_entity_list)
-                if len(new_word_trg) == 1 and not new_word_trg.isalnum() or(compare_lists_length(src_entity_list,
-                                                                                                 trg_entity_list)):
+                if len(new_word_trg) == 1 and not new_word_trg.isalnum() \
+                    or(compare_lists_length(src_entity_list, trg_entity_list)) \
+                    or (get_string_type(new_word_src) != (get_string_type(new_word_trg))):
                     return False
                 
                 pop = to_sample.pop()

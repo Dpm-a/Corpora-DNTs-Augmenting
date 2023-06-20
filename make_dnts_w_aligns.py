@@ -51,7 +51,9 @@ def find_subsequence_indexes(sentence, subsequence):
         return False  # If no subsequences are found, return False
     
 def compare_lists_length(list1, list2):
-    if len(list1) >= 3 * len(list2) or len(list2) >= 4 * len(list1):
+    # Se una delle due stringhe è 3 volte la lunghezza dell'altra, la combinazione verrà scartata.
+    # Questo per evitare casi di palese non corrispondenza
+    if len(list1) >= 3 * len(list2) or len(list2) >= 3 * len(list1):
         return True
     else:
         return False
@@ -59,13 +61,15 @@ def compare_lists_length(list1, list2):
 def transform_string(input_string):
 
     # Move .,;!? and ) next to the previous word
-    transformed_string = re.sub(r'\s*([.,:%;!?\])])\s*', r'\1 ', input_string)
+    transformed_string = re.sub(r'\s*([.,:%;!?\]\})])\s*', r'\1 ', input_string)
     
     # Move - to create a unique word with the previous and next word
     transformed_string = re.sub(r'\s*-\s*', '-', transformed_string)
     
     # Move opening parenthesis to the next word
     transformed_string = re.sub(r'\(\s*', '(', transformed_string)
+    transformed_string = re.sub(r'\[\s*', '[', transformed_string)
+    transformed_string = re.sub(r'\{\s*', '{', transformed_string)
     
     # Fix the format of splitted numbers
     transformed_string = re.sub(r'(\d+([.,]\s*\d+)+)', lambda m: re.sub(r'\s*', '', m.group()), transformed_string)
@@ -143,34 +147,20 @@ def replace_entities_no_align(src_sentence, trg_sentence, to_sample, verbosity: 
     res_src = src_sentence.copy()  # Copia la frase sorgente
     res_trg = trg_sentence.copy()  # Copia la frase destinazione
 
-    # print(" ".join(el for el, _ in src_sentence))
-    # print(" ".join(el for el, _ in trg_sentence), "\n")
-
     src_entities = get_entities(src_sentence)  # Estrae le entità dalla frase sorgente
     trg_entities = get_entities(trg_sentence)  # Estrae le entità dalla frase destinazione
 
-    # print(f"{src_entities = }")
-    # print(f"{trg_entities = }")
-    if verbosity:
-        print(res_src)
-        print(res_trg)
-        print()
-        print(*src_entities, sep="\n")
-        print(*trg_entities, sep="\n")
-        print()
 
     to_delete_src, to_delete_trg = [], []  # Liste per memorizzare gli indici delle parole da eliminare
-
     if src_entities:
+
         # Sostituzione delle entità nella frase sorgente
         for entity, idxs in src_entities.items():
             
             probability = random.random()
             if probability > .6:
                 entity = unidecode(entity.lower()).split()  # Normalizza l'entità e la divide in singole parole
-                #print("ENTITY_S: ", entity)
                 trg_indexes = find_subsequence_indexes([unidecode(el[0].lower()) for el in res_trg], entity)
-                #print("SRC IDX: ", idxs, "TRG IDXS: ", trg_indexes)
                 
                 # Verifica se sono state trovate sottosequenze corrispondenti nella frase destinazione
                 if not trg_indexes or not idxs:
@@ -179,7 +169,6 @@ def replace_entities_no_align(src_sentence, trg_sentence, to_sample, verbosity: 
                 pop = "${DNT0}" + str(to_sample.pop())  # Genera un identificatore unico per l'entità
 
                 # Sostituzione delle entità trovate nella frase sorgente e destinazione
-
                 if len(idxs) > 1:
                     for lst in idxs:
                         if not lst:
@@ -216,29 +205,22 @@ def replace_entities_no_align(src_sentence, trg_sentence, to_sample, verbosity: 
 
     to_delete_src, to_delete_trg = [], []
     if trg_entities:
+
         # Sostituzione delle entità nella frase destinazione
         for entity, idxs in trg_entities.items():
             
             probability = random.random()
             if probability > .6:
                 entity = unidecode(entity.lower()).split()  # Normalizza l'entità e la divide in singole parole
-                # print("ENTITY_S: ", entity)
                 src_indexes = find_subsequence_indexes([unidecode(el[0].lower()) for el in res_src], entity)
-                # print("SRC IDX: ", idxs, "TRG IDXS: ", trg_indexes)
                 
                 # Verifica se sono state trovate sottosequenze corrispondenti nella frase destinazione
                 if not src_indexes or not trg_entities or (len(src_indexes) != len(idxs)):
                     continue
 
-                # print("ENTITY")
-                # print(entity, "\n")
-                # print("SRC IDXS", src_indexes)
-                # print(idxs)
-
                 pop = "${DNT0}" + str(to_sample.pop())  # Genera un identificatore unico per l'entità
 
                 # Sostituzione delle entità trovate nella frase sorgente e destinazione
-
                 if len(idxs) > 1:
                     for lst in idxs:
                         if not lst:
@@ -275,7 +257,7 @@ def replace_entities_no_align(src_sentence, trg_sentence, to_sample, verbosity: 
     return res_src, res_trg
 
 
-def replace_single(idx, src, trg, src_word, src_tag, to_sample, found_als, verbosity) -> None:
+def replace_single(idx, trg_to_discard, src, trg, src_word, src_tag, to_sample, found_als, verbosity) -> None:
 
     """
     Check links related to a specific entity;
@@ -287,9 +269,18 @@ def replace_single(idx, src, trg, src_word, src_tag, to_sample, found_als, verbo
     if links and links[0] in trg:
         trg_word, trg_tag= trg[links[0]]["word"], trg[links[0]]["tag"]
 
-        if trg_tag == src_tag and "DNT" not in trg_word and trg_word.isalnum():
+        clear_src_word = unidecode(src_word).lower()
+        clear_trg_word = unidecode(trg_word).lower()
+        if (trg_tag == src_tag and "DNT" not in trg_word and trg_word.isalnum()
+            and clear_src_word != clear_trg_word
+            ):
+
+            trg_words = [unidecode(word).lower() for word in trg_to_discard.split()]
+            if clear_src_word in trg_words:
+                return
+
             found_als.append(f"{idx} = [{src_tag}][{src_word}] -> {links[0]} = [{trg_tag}][{trg_word}]")
-            
+
             if verbosity:
                 print(f"{idx} = [{src_tag}][{src_word}] -> {links[0]} = [{trg_tag}][{trg_word}]")
                 
@@ -310,7 +301,6 @@ def replace_multiple(idx, src, trg, src_tag, src_entity_list, entity_words_idx, 
     """
 
     link = src[entity_words_idx[0]]["to"]
-    # pop, new_word_src = None, None  # Initialize sample_extraction with a default value
     
     if link:
         # print("LINK: ", link)
@@ -374,7 +364,8 @@ def make_dnt_BIO(src_sentence, trg_sentence, alignments, found_als, sentence_ind
     src_to_discard = " ".join(word for word,_ in src_sentence)
     trg_to_discard = " ".join(word for word,_ in trg_sentence)
 
-    to_sample = random.sample(range(25) if 25 > len(src_sentence) else range(len(src_sentence)), k = len(src_sentence))
+    to_sample = random.sample(range(25) if 25 > len(src_sentence) else range(len(src_sentence)), 
+                              k = len(src_sentence))
     src_sentence, trg_sentence = replace_entities_no_align(src_sentence, trg_sentence, to_sample)
     
     src = { i : {"word" : word, 
@@ -403,8 +394,7 @@ def make_dnt_BIO(src_sentence, trg_sentence, alignments, found_als, sentence_ind
                 j += 1
 
             probability = random.random()
-            if probability > .7:    
-                if verbosity: print(f"{entity = }, link = {src[entity_words_idx[0]]['to']}")  
+            if probability > .6:
                 if len(entity) > 1:
                     replaced = replace_multiple(idx, src, trg, src_tag, entity, entity_words_idx, to_sample, found_als, verbosity)
                     if replaced: 
@@ -413,19 +403,12 @@ def make_dnt_BIO(src_sentence, trg_sentence, alignments, found_als, sentence_ind
                 # if entity is only 1 word long, we find the link in trg
                 elif len(entity) == 1 and entity[0].isalnum():
                     if verbosity: print("len 1 entity: " , entity)
-                    replace_single(idx, src, trg, src_word, src_tag, to_sample, found_als, verbosity)
+                    replace_single(idx, trg_to_discard, src, trg, src_word, src_tag, to_sample, found_als, verbosity)
                     idx = j - 1
 
         # Se la parola non ha un tag utile, ci spostiamo alla successiva 
         idx += 1
 
-    
-    if verbosity:
-        print(*[ (el["word"], el["tag"]) for i, el in src.items()], sep = "\n")
-        print()
-        print(*[ (el["word"], el["tag"]) for i, el in trg.items()], sep = "\n")
-        print()
-        print(alignments)
 
     # Se il rateo di DNTs è troppo elevato, restituiamo la frase originale
     dnts = sum( 1 if "DNT" in word else 0 for word in [el["word"]for el in src.values()])
@@ -482,7 +465,7 @@ def main(source_pavlov, target_pavlov, alignments):
         d.writelines([str(el) + "\n" for el in discarded])
 
     print()
-    print(f"DNTs in each corpora = {dnt_counts}")
+    print(f"DNTs in each corpora = {dnt_counts:,}")
     print("  ================================  ")
     print()
 

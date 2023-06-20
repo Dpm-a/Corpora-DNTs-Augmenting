@@ -1,3 +1,4 @@
+import re
 import random
 import pickle
 import argparse
@@ -7,7 +8,7 @@ from nltk.corpus import stopwords
 italian_stopwords = stopwords.words("italian")
 english_stopwords = stopwords.words("english")
 
-admitted_tags = {"LOC", "PERSON", "GPE", "ORG", "PRODUCT", "FAC"}
+admitted_tags = {"LOC", "PERSON", "GPE", "ORG", "FAC"}
 stops = set ( italian_stopwords + english_stopwords )
 discarded = []
 
@@ -34,7 +35,6 @@ def are_sentences_same(sentence1, sentence2):
     words2 = set(sentence2)
     return words1 == words2
 
-
 def find_subsequence_indexes(sentence, subsequence):
     indexes = []
     sub_len = len(subsequence)
@@ -51,11 +51,36 @@ def find_subsequence_indexes(sentence, subsequence):
         return False  # If no subsequences are found, return False
     
 def compare_lists_length(list1, list2):
-    if len(list1) >= 4 * len(list2) or len(list2) >= 4 * len(list1):
+    if len(list1) >= 3 * len(list2) or len(list2) >= 4 * len(list1):
         return True
     else:
         return False
     
+def transform_string(input_string):
+
+    # Move .,;!? and ) next to the previous word
+    transformed_string = re.sub(r'\s*([.,:%;!?\])])\s*', r'\1 ', input_string)
+    
+    # Move - to create a unique word with the previous and next word
+    transformed_string = re.sub(r'\s*-\s*', '-', transformed_string)
+    
+    # Move opening parenthesis to the next word
+    transformed_string = re.sub(r'\(\s*', '(', transformed_string)
+    
+    # Fix the format of splitted numbers
+    transformed_string = re.sub(r'(\d+([.,]\s*\d+)+)', lambda m: re.sub(r'\s*', '', m.group()), transformed_string)
+    
+    # Join the extracted matches with a space
+    transformed_string = re.sub(r'" ([^"]+) "', r'"\1"', transformed_string)
+
+    #merge consecutive symbols
+    transformed_string = re.sub(r'([^a-zA-Z])\s+\1(\s+\1)*', lambda m: m.group(0).replace(" ", ""), transformed_string)
+
+    # # uppercase letter followed by a dot and space and a number
+    # modified_string = re.sub(r'([A-Z]*)\.\s+(\d+)', r'\1.\2', input_string)
+    
+    return transformed_string
+
 def get_string_type(string):
     # Remove whitespace from the string
     string = string.strip()
@@ -74,32 +99,6 @@ def get_string_type(string):
 
     # If none of the above conditions are met, it can be a combination of types
     return "Combination"
-
-def modify_lastly_occurences(src, trg, trg_sentence, admitted_tags, to_sample):
-    trg_word_idx_dic = {unidecode(word.lower()) : idx for idx , (word, _) in enumerate(trg_sentence)}
-
-    for idx, word_tag_to in src.items():
-        probability = random.random()
-        if probability > .7:
-            current_word = unidecode(word_tag_to["word"].lower())
-            
-            # Se la parola corrente non è nella lista "stops", contiene solo caratteri alfanumerici, la sua lunghezza
-            # èmaggiore di 1 e si trova nelle parole TRG, estraggo l'indice
-            if current_word not in stops    \
-                and current_word.isalnum()  \
-                and len(current_word) > 1   \
-                and current_word in trg_word_idx_dic.keys():
-
-                target_inx = trg_word_idx_dic[current_word]
-
-                # Se l'indice è ancora disponibile nella frase gia processata e il tag della parola SRC o TRG è
-                # in admitted_tags, sostituisco.
-                if target_inx in trg.keys() \
-                    and (word_tag_to["tag"][2:] in admitted_tags or trg[target_inx]["tag"][2:] in admitted_tags):
-                        
-                    pop = "${DNT0}" + str(to_sample.pop())
-                    src[idx]["word"] = pop
-                    trg[target_inx]["word"] = pop
 
 
 def get_entities(sentence):
@@ -289,10 +288,10 @@ def replace_single(idx, src, trg, src_word, src_tag, to_sample, found_als, verbo
         trg_word, trg_tag= trg[links[0]]["word"], trg[links[0]]["tag"]
 
         if trg_tag == src_tag and "DNT" not in trg_word and trg_word.isalnum():
-            found_als.append(f"{idx} = {src_word} -> {links[0]} = {trg_word}")
-
+            found_als.append(f"{idx} = [{src_tag}][{src_word}] -> {links[0]} = [{trg_tag}][{trg_word}]")
+            
             if verbosity:
-                print(f"{idx} = {src_word} -> {links[0]} = {trg[links[0]]['word']}")
+                print(f"{idx} = [{src_tag}][{src_word}] -> {links[0]} = [{trg_tag}][{trg_word}]")
                 
             # extract a random number and replace in dictionary
             pop = "${DNT0}" + str(to_sample.pop())
@@ -360,11 +359,10 @@ def replace_multiple(idx, src, trg, src_tag, src_entity_list, entity_words_idx, 
                     trg[link]['word'] = "${DNT0}" + str(pop)
                     trg[link]['tag'] = "ENTITY"
 
-                    found_als.append(f"{entity_words_idx[0]} = {new_word_src} -> {link} = {new_word_trg}")
+                    found_als.append(f"{entity_words_idx[0]} = [{src_tag}][{new_word_src}] -> {link} = [{trg[link]['tag']}][{new_word_trg}]")
                     return True
                 
     return False
-
 
 
 def make_dnt_BIO(src_sentence, trg_sentence, alignments, found_als, sentence_index, verbosity: int = 0):
@@ -379,9 +377,14 @@ def make_dnt_BIO(src_sentence, trg_sentence, alignments, found_als, sentence_ind
     to_sample = random.sample(range(25) if 25 > len(src_sentence) else range(len(src_sentence)), k = len(src_sentence))
     src_sentence, trg_sentence = replace_entities_no_align(src_sentence, trg_sentence, to_sample)
     
-    src = { i : {"word" : word, "tag": tag, "to": [tup[1] for tup in alignments if tup[0]==i] } \
+    src = { i : {"word" : word, 
+                 "tag": tag, 
+                 "to": [tup[1] for tup in alignments if tup[0]==i] } 
             for i, (word, tag) in enumerate(src_sentence) }
-    trg = { i : {"word" : word, "tag": tag, "to": [tup[0] for tup in alignments if tup[1]==i] } \
+    
+    trg = { i : {"word" : word, 
+                 "tag": tag, 
+                 "to": [tup[0] for tup in alignments if tup[1]==i] } 
             for i, (word, tag) in enumerate(trg_sentence) }
     
     idx = 0
@@ -423,7 +426,6 @@ def make_dnt_BIO(src_sentence, trg_sentence, alignments, found_als, sentence_ind
         print(*[ (el["word"], el["tag"]) for i, el in trg.items()], sep = "\n")
         print()
         print(alignments)
-    modify_lastly_occurences(src, trg, trg_sentence, admitted_tags, to_sample)
 
     # Se il rateo di DNTs è troppo elevato, restituiamo la frase originale
     dnts = sum( 1 if "DNT" in word else 0 for word in [el["word"]for el in src.values()])
@@ -433,8 +435,12 @@ def make_dnt_BIO(src_sentence, trg_sentence, alignments, found_als, sentence_ind
         discarded.append(sentence_index)
         return src_to_discard, trg_to_discard, 0
     
-    src_res = " ".join([res["word"] for _, res in src.items() if res["tag"] != "TO_SKIP"])
-    trg_res = " ".join([res["word"] for _, res in trg.items() if res["tag"] != "TO_SKIP"])
+    src_res = transform_string( " ".join([res["word"] 
+                                          for _, res in src.items() 
+                                          if res["tag"] != "TO_SKIP"]) ).rstrip()
+    trg_res = transform_string( " ".join([res["word"] 
+                                          for _, res in trg.items() 
+                                          if res["tag"] != "TO_SKIP"]) ).rstrip()
     return src_res, trg_res, dnts
 
 

@@ -61,7 +61,7 @@ def compare_lists_length(list1, list2):
 def transform_string(input_string):
 
     # Move .,;!? and ) next to the previous word
-    transformed_string = re.sub(r'\s*([.,:%;!?\]\})])\s*', r'\1 ', input_string)
+    transformed_string = re.sub(r'\s*([.,:%;!?\])])\s*', r'\1 ', input_string)
     
     # Move - to create a unique word with the previous and next word
     transformed_string = re.sub(r'\s*-\s*', '-', transformed_string)
@@ -69,7 +69,6 @@ def transform_string(input_string):
     # Move opening parenthesis to the next word
     transformed_string = re.sub(r'\(\s*', '(', transformed_string)
     transformed_string = re.sub(r'\[\s*', '[', transformed_string)
-    transformed_string = re.sub(r'\{\s*', '{', transformed_string)
     
     # Fix the format of splitted numbers
     transformed_string = re.sub(r'(\d+([.,]\s*\d+)+)', lambda m: re.sub(r'\s*', '', m.group()), transformed_string)
@@ -355,7 +354,7 @@ def replace_multiple(idx, src, trg, src_tag, src_entity_list, entity_words_idx, 
     return False
 
 
-def make_dnt_BIO(src_sentence, trg_sentence, alignments, found_als, sentence_index, verbosity: int = 0):
+def make_dnt_BIO(src_sentence, trg_sentence, alignments, found_als, sentence_index, modality, verbosity: int = 0):
 
     global stops
     global admitted_tags
@@ -367,6 +366,24 @@ def make_dnt_BIO(src_sentence, trg_sentence, alignments, found_als, sentence_ind
     to_sample = random.sample(range(25) if 25 > len(src_sentence) else range(len(src_sentence)), 
                               k = len(src_sentence))
     src_sentence, trg_sentence = replace_entities_no_align(src_sentence, trg_sentence, to_sample)
+
+    if modality == "no_align":
+         # Se il rateo di DNTs è troppo elevato, restituiamo la frase originale
+        dnts = sum( 1 if "DNT" in word else 0 for word, _ in src_sentence)
+        others = len([word for word,_ in src_sentence if len(word) > 1 and word.isalnum()])
+        sentence_dnt_rateo = (dnts / others) if others > 0 else 1
+        if sentence_dnt_rateo > .5:
+            discarded.append(sentence_index)
+            return src_to_discard, trg_to_discard, 0
+
+        src_res = transform_string( " ".join([word 
+                                                for word, tag in src_sentence
+                                                if tag != "TO_SKIP"]) ).rstrip()
+        trg_res = transform_string( " ".join([word 
+                                                for word, tag in trg_sentence
+                                                if tag != "TO_SKIP"]) ).rstrip()
+        return src_res, trg_res, dnts
+
     
     src = { i : {"word" : word, 
                  "tag": tag, 
@@ -428,14 +445,13 @@ def make_dnt_BIO(src_sentence, trg_sentence, alignments, found_als, sentence_ind
 
 
 
-def main(source_pavlov, target_pavlov, alignments):
+def main(source_pavlov, target_pavlov, alignments, modality):
 
     dnt_counts = 0
     
     with open(alignments, "r") as als, \
-         open(source_pavlov + ".dnts2", "w") as source_out, \
-         open(target_pavlov + ".dnts2", "w") as target_out, \
-         open("alignments_found.align", "w") as f, \
+         open(source_pavlov + f".dnts.{modality}", "w") as source_out, \
+         open(target_pavlov + f".dnts.{modality}", "w") as target_out, \
          open("discarted_dnts", "w") as d:
         
         source = load_pickle(source_pavlov)
@@ -450,17 +466,20 @@ def main(source_pavlov, target_pavlov, alignments):
             found_als = list()
             src_sentence, trg_sentence , dnt_count = make_dnt_BIO(src_sentence, trg_sentence, 
                                                                     alignment, 
-                                                                    found_als, i, verbosity=0)
+                                                                    found_als, i, 
+                                                                    modality, verbosity=0)
             
             source_out.write(src_sentence + "\n")
             target_out.write(trg_sentence + "\n")
-            if found_als: 
-                f.write(str((i,found_als)) + "\n")
+
+            if found_als and modality == "align": 
+                with open("alignments_found.align", "w") as f:
+                    f.write(str((i, found_als)) + "\n")
 
             dnt_counts += dnt_count
 
             if i % 50_000 == 0:
-                print(f"Iteration -> {i}")
+                print(f"Iteration -> {i:,}")
 
         d.writelines([str(el) + "\n" for el in discarded])
 
@@ -476,9 +495,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Make pavlov corpora suitable for Fast Align")
     parser.add_argument("-s", help = "Path to input source pavlov file")
     parser.add_argument("-t", help = "Path to input target pavlov file")
-    parser.add_argument("-a", help = "Path to alignments", default = "./alignments/forward.light.align")
-    #parser.add_argument("-m", help = "Tagging Modality", default = "occurrency_only")
+    parser.add_argument("-a", help = "Path to alignments", default = "./alignments/sym.union.align")
+    parser.add_argument("-m", help = "Tagging Modality", choices=["align", "no_align"], default = "align")
 
     args = parser.parse_args()
 
-    main(args.s, args.t, args.a)
+    main(args.s, args.t, args.a, args.m)

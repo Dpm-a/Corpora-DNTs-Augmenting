@@ -142,7 +142,7 @@ def get_entities(sentence):
     return entities_dict
 
 
-def replace_entities_no_align(src_sentence, trg_sentence, to_sample, verbosity: int = 0):
+def replace_entities_no_align(src_sentence, trg_sentence, to_sample, probability):
     res_src = src_sentence.copy()  # Copia la frase sorgente
     res_trg = trg_sentence.copy()  # Copia la frase destinazione
 
@@ -156,8 +156,8 @@ def replace_entities_no_align(src_sentence, trg_sentence, to_sample, verbosity: 
         # Sostituzione delle entità nella frase sorgente
         for entity, idxs in src_entities.items():
             
-            probability = random.random()
-            if probability > .6:
+            current_prob = random.random()
+            if current_prob >= probability:
                 entity = unidecode(entity.lower()).split()  # Normalizza l'entità e la divide in singole parole
                 trg_indexes = find_subsequence_indexes([unidecode(el[0].lower()) for el in res_trg], entity)
                 
@@ -208,8 +208,8 @@ def replace_entities_no_align(src_sentence, trg_sentence, to_sample, verbosity: 
         # Sostituzione delle entità nella frase destinazione
         for entity, idxs in trg_entities.items():
             
-            probability = random.random()
-            if probability > .6:
+            current_prob = random.random()
+            if current_prob >= probability:
                 entity = unidecode(entity.lower()).split()  # Normalizza l'entità e la divide in singole parole
                 src_indexes = find_subsequence_indexes([unidecode(el[0].lower()) for el in res_src], entity)
                 
@@ -256,7 +256,7 @@ def replace_entities_no_align(src_sentence, trg_sentence, to_sample, verbosity: 
     return res_src, res_trg
 
 
-def replace_single(idx, trg_to_discard, src, trg, src_word, src_tag, to_sample, found_als, verbosity) -> None:
+def replace_single(idx, trg_to_discard, src, trg, src_word, src_tag, to_sample, found_als) -> None:
 
     """
     Check links related to a specific entity;
@@ -279,9 +279,6 @@ def replace_single(idx, trg_to_discard, src, trg, src_word, src_tag, to_sample, 
                 return
 
             found_als.append(f"{idx} = [{src_tag}][{src_word}] -> {links[0]} = [{trg_tag}][{trg_word}]")
-
-            if verbosity:
-                print(f"{idx} = [{src_tag}][{src_word}] -> {links[0]} = [{trg_tag}][{trg_word}]")
                 
             # extract a random number and replace in dictionary
             pop = "${DNT0}" + str(to_sample.pop())
@@ -289,7 +286,7 @@ def replace_single(idx, trg_to_discard, src, trg, src_word, src_tag, to_sample, 
             trg[links[0]]['word'] = pop
 
 
-def replace_multiple(idx, src, trg, src_tag, src_entity_list, entity_words_idx, to_sample, found_als, verbosity) -> tuple:
+def replace_multiple(idx, src, trg, src_tag, src_entity_list, entity_words_idx, to_sample, found_als) -> tuple:
 
     """
     Check links related to a specific "B-" starting entity.
@@ -354,7 +351,7 @@ def replace_multiple(idx, src, trg, src_tag, src_entity_list, entity_words_idx, 
     return False
 
 
-def make_dnt_BIO(src_sentence, trg_sentence, alignments, found_als, sentence_index, modality, verbosity: int = 0):
+def make_dnt_BIO(src_sentence, trg_sentence, alignments, found_als, sentence_index, modality, probability):
 
     global stops
     global admitted_tags
@@ -365,7 +362,7 @@ def make_dnt_BIO(src_sentence, trg_sentence, alignments, found_als, sentence_ind
 
     to_sample = random.sample(range(25) if 25 > len(src_sentence) else range(len(src_sentence)), 
                               k = len(src_sentence))
-    src_sentence, trg_sentence = replace_entities_no_align(src_sentence, trg_sentence, to_sample)
+    src_sentence, trg_sentence = replace_entities_no_align(src_sentence, trg_sentence, to_sample, probability)
 
     if modality == "no_align":
          # Se il rateo di DNTs è troppo elevato, restituiamo la frase originale
@@ -410,17 +407,16 @@ def make_dnt_BIO(src_sentence, trg_sentence, alignments, found_als, sentence_ind
                 entity_words_idx.append(j)
                 j += 1
 
-            probability = random.random()
-            if probability > .6:
+            current_prob = random.random()
+            if current_prob >= probability:
                 if len(entity) > 1:
-                    replaced = replace_multiple(idx, src, trg, src_tag, entity, entity_words_idx, to_sample, found_als, verbosity)
+                    replaced = replace_multiple(idx, src, trg, src_tag, entity, entity_words_idx, to_sample, found_als)
                     if replaced: 
                         idx = j
 
                 # if entity is only 1 word long, we find the link in trg
                 elif len(entity) == 1 and entity[0].isalnum():
-                    if verbosity: print("len 1 entity: " , entity)
-                    replace_single(idx, trg_to_discard, src, trg, src_word, src_tag, to_sample, found_als, verbosity)
+                    replace_single(idx, trg_to_discard, src, trg, src_word, src_tag, to_sample, found_als)
                     idx = j - 1
 
         # Se la parola non ha un tag utile, ci spostiamo alla successiva 
@@ -445,7 +441,7 @@ def make_dnt_BIO(src_sentence, trg_sentence, alignments, found_als, sentence_ind
 
 
 
-def main(source_pavlov, target_pavlov, alignments, modality):
+def main(source_pavlov, target_pavlov, alignments, modality, probability):
 
     dnt_counts = 0
     
@@ -456,6 +452,7 @@ def main(source_pavlov, target_pavlov, alignments, modality):
         
         source = load_pickle(source_pavlov)
         target = load_pickle(target_pavlov)
+        alignments_found = []
 
         for i, (src_sentence, trg_sentence, alignment) in enumerate(zip( source, target, als ), start = 0):
 
@@ -467,25 +464,27 @@ def main(source_pavlov, target_pavlov, alignments, modality):
             src_sentence, trg_sentence , dnt_count = make_dnt_BIO(src_sentence, trg_sentence, 
                                                                     alignment, 
                                                                     found_als, i, 
-                                                                    modality, verbosity=0)
+                                                                    modality, probability)
             
             source_out.write(src_sentence + "\n")
             target_out.write(trg_sentence + "\n")
-
-            if found_als and modality == "align": 
-                with open("alignments_found.align", "w") as f:
-                    f.write(str((i, found_als)) + "\n")
+            if found_als: 
+                alignments_found.append(str((i, found_als)))
 
             dnt_counts += dnt_count
 
             if i % 50_000 == 0:
                 print(f"Iteration -> {i:,}")
 
+        if alignments_found and modality == "align": 
+            with open("alignments.log", "w") as f:
+                f.writelines([el + "\n" for el in alignments_found])
+
         d.writelines([str(el) + "\n" for el in discarded])
 
     print()
-    print(f"DNTs in each corpora = {dnt_counts:,}")
     print("  ================================  ")
+    print(f"DNTs in each corpora = {dnt_counts:,}")
     print()
 
 
@@ -497,7 +496,8 @@ if __name__ == "__main__":
     parser.add_argument("-t", help = "Path to input target pavlov file")
     parser.add_argument("-a", help = "Path to alignments", default = "./alignments/sym.union.align")
     parser.add_argument("-m", help = "Tagging Modality", choices=["align", "no_align"], default = "align")
+    parser.add_argument("-p", help = "In case a probability filter is wanted to be used", default= .0)
 
     args = parser.parse_args()
 
-    main(args.s, args.t, args.a, args.m)
+    main(args.s, args.t, args.a, args.m, (1 - float(args.p)) if args.p else .0)

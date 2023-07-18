@@ -1,7 +1,7 @@
 #  Parallel Dataset creation with DNTs (Do Not Translate) terms
 
 ```bash
-git clone https://github.com/lukefleed/imdb-graph
+git clone https://github.com/Dpm-a/DNTs
 ```
 
 ## Documentation

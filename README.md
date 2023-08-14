@@ -91,8 +91,12 @@ More on this software can be found on the original repo's page [Fast Align](http
 
 
 # III. DNT Augmentation
-Finally, to replace DNT’s in the given corpora, run [make_dnts.py](https://github.com/Dpm-a/DNTs/blob/main/make_dnts_algorithm3.py):
-```bash python make_dnts -s source.pavlov -t target.pavlov -a alignments.txt -p 0.5 -v 1```
+Finally, to replace DNT’s in the given corpora, run [```make_dnts.py```](https://github.com/Dpm-a/DNTs/blob/main/make_dnts_algorithm3.py):
+
+```bash 
+python make_dnts.py -s <src>.pavlov -t <trg>.pavlov -a alignments.txt -g .5 -v 1
+```
+
 where:
 - **"-s"**, **"--source"** → source file path
 - **"-t"**, **"--target"** → target file path

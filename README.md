@@ -32,7 +32,7 @@ python pavlov_tagger_pickle.py -s <source.file> -t <target.file>
 The source and target texts are **tokenized** and **tagged**. For each token, there is a tag with **BIO markup**. Tags are separated from tokens with whitespaces.  Finally, Sentences are separated with empty lines.
 
 ### GPU usage for pavlov
-**!NOTE**: Run the script on machine with a decent GPU (Nvidia Quadro T4 or better is best), the NER tagger is based on BERT Transformer and a gpu is a good boost for inference.
+**!NOTE**: Run the script on machine with a decent GPU (Nvidia Quadro T4 or better is best), the NER tagger is based on BERT Transformer and a gpu is a good boost for inference, considering corpora of millions of rows.
 More on BERT architecture:
   * [Jacob Devlin](https://arxiv.org/search/cs?searchtype=author&query=Devlin%2C+J), [Ming-Wei Chang](https://dblp.uni-trier.de/pid/69/4618.html), [Kenton Lee](https://dblp.uni-trier.de/pid/121/7560.html) and [Kristina Toutanova](https://dblp.uni-trier.de/pid/25/1520.html?q=Kristina%20Toutanova). (2019). [BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding](https://arxiv.org/abs/1810.04805)
 
@@ -58,9 +58,9 @@ Once the tagged text is output we are going to exploit Fastalign to generate ali
 
 Building `fast_align` requires a modern C++ compiler and the CMake build system. Additionally, the following libraries can be used to obtain better performance.
 
-To compile and run it, do the following
+To compile and run it, do the following:
 ```bash
-git clone https://github.com/clab/fast_align/tree/master
+git clone https://github.com/clab/fast_align
 cd fast_align
 mkdir build
 cd build
@@ -68,7 +68,8 @@ cmake ..
 make
 ```
 
-**Note**: DeepPavlov will generate tokenized text, and fastalign will need those tokens to be aligned (otherwise the plain original string will produce less alignments with respect to real tags). For this reason we are going to use the following commands:
+**Note**: DeepPavlov will generate tokenized text, and fastalign will need those tokens to be aligned (otherwise the plain original string will produce less alignments with respect to real tags).<br> 
+For this reason we are going to use the following commands in ```build/``` folder:
 ```bash
 python merge_and_fast_align.py -s source.pavlov -t target.pavlov -i 5
 ```
@@ -104,11 +105,10 @@ where:
 This script will generate two files containing DNTs reaplacing entities and optionally a log to check alignments found and replaced by the script itself.
 
 ## Utils
-This folder contains few additional scripts:
-- [suffle_corpora.py](https://github.com/Dpm-a/DNTs/blob/main/utils/shuffle_corpora.py), 
-  As the name suggests, it **parallelly** shuffles corpora mantaining indexes and thus the coupling of the sentences.
-  
-  Use this script before feeding the training parallel corpora to your NMT model.
+[Utils folder](https://github.com/Dpm-a/DNTs/tree/main/utils) contains few additional scripts:
+- [```shuffle_corpora.py```](https://github.com/Dpm-a/DNTs/blob/main/utils/shuffle_corpora.py), 
+  As the name suggests, it shuffles **in parallel** corpora mantaining indexes and thus the coupling of the sentences.<br>
+  Use this script before feeding the training parallel corpora to your NMT model.<br>
   Usage:
   ```bash
   python suffle_corpora.py -s <source.file> -t <target.file>
@@ -117,16 +117,15 @@ This folder contains few additional scripts:
   Optionally, and more RAM-friendly, only on Linux:
   ```bash
   # EXAMPLE on zipped files 
-  paste <(unxz -dc OPUS-News-Commentary_it-ru.it.xz) \
-   <(unxz -dc OPUS-News-Commentary_it-ru.ru.xz) \
+  paste <(unxz -dc OPUS-News-Commentary_<src>-<trg>.<src>.xz) \
+   <(unxz -dc OPUS-News-Commentary_<src>-<trg>.<src>.<trg>.xz) \
    | shuf > /tmp/__tmp__
 
   # get back original files
   cut -f1 /tmp/__tmp__ > /tmp/__tmp__.<src>
   cut -f2 /tmp/__tmp__ > /tmp/__tmp__.<trg>
   ```
-- [count_dnt.py](https://github.com/Dpm-a/DNTs/blob/main/utils/count_dnt.py), counts DNTs tags inside both corpora, asserting the correctness of the process.
-
+- [```count_dnt.py```](https://github.com/Dpm-a/DNTs/blob/main/utils/count_dnt.py), counts DNTs tags inside both corpora, asserting the correctness of the process.<br>
   Usage:
    ```bash
    python count_dnt.py <source.file> <target.file>
@@ -134,11 +133,10 @@ This folder contains few additional scripts:
 
   Optionally, only on linux:
   ```bash
-  cat train.it-tr.it | grep -o "{DNT0}" | wc -l
-  cat train.it-tr.tr | grep -o "{DNT0}" | wc -l
+  cat train.<src>-<trg>.<src> | grep -o "{DNT0}" | wc -l
+  cat train.<src>-<trg>.<trg> | grep -o "{DNT0}" | wc -l
   ```
-- [check_dnt.py](https://github.com/Dpm-a/DNTs/blob/main/utils/check_dnt.py), which provides some useful statistics on translations made by NMTs models. It firsts points out disalignments with respect to DNTs tag row by row, then calculates Precision and Recall on those results.
-- 
+- [```check_dnt.py```](https://github.com/Dpm-a/DNTs/blob/main/utils/check_dnt.py), which provides some useful statistics on translations made by NMTs models. It firsts points out disalignments with respect to DNTs tag row by row, then calculates Precision and Recall on those results.<br> 
   Usage:
    ```bash
    python check_dnt.py --ref <source.file> --hyp <target.file>

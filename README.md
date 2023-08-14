@@ -1,8 +1,6 @@
 #  Parallel Dataset creation with DNTs (Do Not Translate) terms
 
-```bash
-git clone https://github.com/Dpm-a/DNTs
-```
+
 
 # Documentation
 In order to tag our parallel dataset we are going to use different tools which are used to both align and tag sentences and finally return a corpora with `${DNT0}X` tags replacing selected entities.
@@ -11,13 +9,14 @@ In order to tag our parallel dataset we are going to use different tools which a
 # Usage
 First of all, we need to install dependencies:
 ```bash
+git clone https://github.com/Dpm-a/DNTs
 cd DNTs/
 pip install -r requirements.txt
 ```
 
 
 
-## I. DeepPavlov
+# I. DeepPavlov
 This library is used for a big variety of tasks, including Naming Entity Recognition which is in line with our goals.
 
 DeepPavlov has been chosen due to the vast availability of models, including the **ner_ontonotes_bert_mult** multilingual one that we are going to exploit (more on [OntoNotes](https://paperswithcode.com/dataset/ontonotes-5-0)).
@@ -32,7 +31,11 @@ python pavlov_tagger_pickle.py -s <source.file> -t <target.file>
 ```
 The source and target texts are **tokenized** and **tagged**. For each token, there is a tag with **BIO markup**. Tags are separated from tokens with whitespaces.  Finally, Sentences are separated with empty lines.
 
-#### GPU usage for pavlov
+### GPU usage for pavlov
+**!NOTE**: Run the script on machine with a decent GPU (Nvidia Quadro T4 or better is best), the NER tagger is based on BERT Transformer and a gpu is a good boost for inference.
+More on BERT architecture:
+  * [Jacob Devlin](https://arxiv.org/search/cs?searchtype=author&query=Devlin%2C+J), [Ming-Wei Chang](https://dblp.uni-trier.de/pid/69/4618.html), [Kenton Lee](https://dblp.uni-trier.de/pid/121/7560.html) and [Kristina Toutanova](https://dblp.uni-trier.de/pid/25/1520.html?q=Kristina%20Toutanova). (2019). [BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding](https://arxiv.org/abs/1810.04805)
+
 To run or train PyTorch-based DeepPavlov models on GPU you should have [CUDA](https://developer.nvidia.com/cuda-toolkit) installed on your host machine, and install model’s package requirements. CUDA version should be compatible with DeepPavlov [required PyTorch version](https://github.com/Dpm-a/DNTs/blob/main/requirements.txt).
 
 Let's say you want to use your #3 device (gpu), make sure to make the cude device visible for the script by either running CLI command:
@@ -49,7 +52,7 @@ For anything else, please give a look to the official documentation of [DeepPavl
 
 
 
-## II. FastAlign
+# II. FastAlign
 
 Once the tagged text is output we are going to exploit Fastalign to generate alings between each pair of translation. We are going to take into account aliments made by both sides (from left sentence to right one and viceversa), leading us to a more concise union of the two sets.
 

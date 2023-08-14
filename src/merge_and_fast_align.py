@@ -30,7 +30,8 @@ def load_pickle(filename):
 
 def main(input_source_file,
          input_target_file,
-         fa_iterations):
+         fa_iterations,
+         command):
     
     out = find_equal_prefix(input_source_file, input_target_file)
 
@@ -74,7 +75,7 @@ def main(input_source_file,
         fr.close()
 
         print("... Generating UNION Alignments ...\n")
-        alignments = subprocess.run(["./atools", "-i", "fa_forward", "-j", "fa_reverse", "-c", "union"], capture_output=True, text=True)
+        alignments = subprocess.run(["./atools", "-i", "fa_forward", "-j", "fa_reverse", "-c", f"{command}"], capture_output=True, text=True)
         un.write(alignments.stdout)
                     
     
@@ -87,8 +88,14 @@ if __name__ == "__main__":
     parser.add_argument("-s", help = "Path to input source language file")
     parser.add_argument("-t", help = "Path to input target language file")
     parser.add_argument("-i", help = "Fast Align Training Iteration", default=5)
-
+    parset.add_argument("-c", help = "Command", choices = ["fmeasure", 
+                                                           "grow-diag", 
+                                                           "grow-diag-final", 
+                                                           "grow-diag-final-and", 
+                                                           "intersect",
+                                                           "invert",
+                                                           "union"], default = "union")
 
     args = parser.parse_args()
 
-    main(args.s, args.t, int(args.i))
+    main(args.s, args.t, int(args.i), args.c)

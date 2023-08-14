@@ -89,7 +89,7 @@ More on this software can be found on the original repo's page [Fast Align](http
 * [Chris Dyer](http://www.cs.cmu.edu/~cdyer), [Victor Chahuneau](http://victor.chahuneau.fr), and [Noah A. Smith](http://www.cs.cmu.edu/~nasmith). (2013). [A Simple, Fast, and Effective Reparameterization of IBM Model 2](http://www.ark.cs.cmu.edu/cdyer/fast_valign.pdf). In *Proc. of NAACL*.
 
 
-## III. DNT Augmentation
+# III. DNT Augmentation
 Finally, to replace DNT’s in the given corpora, run [make_dnts.py](https://github.com/Dpm-a/DNTs/blob/main/make_dnts_algorithm3.py):
 ```bash python make_dnts -s source.pavlov -t target.pavlov -a alignments.txt -p 0.5 -v 1```
 where:
@@ -102,5 +102,46 @@ where:
     - ```alignments.log``` : alignments from Fast Align
 
 This script will generate two files containing DNTs reaplacing entities and optionally a log to check alignments found and replaced by the script itself.
+
+## Utils
+This folder contains few additional scripts:
+- [suffle_corpora.py](https://github.com/Dpm-a/DNTs/blob/main/utils/shuffle_corpora.py), 
+  As the name suggests, it **parallelly** shuffles corpora mantaining indexes and thus the coupling of the sentences.
+  
+  Use this script before feeding the training parallel corpora to your NMT model.
+  Usage:
+  ```bash
+  python suffle_corpora.py -s <source.file> -t <target.file>
+  ```
+
+  Optionally, and more RAM-friendly, only on Linux:
+  ```bash
+  # EXAMPLE on zipped files 
+  paste <(unxz -dc OPUS-News-Commentary_it-ru.it.xz) \
+   <(unxz -dc OPUS-News-Commentary_it-ru.ru.xz) \
+   | shuf > /tmp/__tmp__
+
+  # get back original files
+  cut -f1 /tmp/__tmp__ > /tmp/__tmp__.<src>
+  cut -f2 /tmp/__tmp__ > /tmp/__tmp__.<trg>
+  ```
+- [count_dnt.py](https://github.com/Dpm-a/DNTs/blob/main/utils/count_dnt.py), counts DNTs tags inside both corpora, asserting the correctness of the process.
+
+  Usage:
+   ```bash
+   python count_dnt.py <source.file> <target.file>
+   ```
+
+  Optionally, only on linux:
+  ```bash
+  cat train.it-tr.it | grep -o "{DNT0}" | wc -l
+  cat train.it-tr.tr | grep -o "{DNT0}" | wc -l
+  ```
+- [check_dnt.py](https://github.com/Dpm-a/DNTs/blob/main/utils/check_dnt.py), which provides some useful statistics on translations made by NMTs models. It firsts points out disalignments with respect to DNTs tag row by row, then calculates Precision and Recall on those results.
+- 
+  Usage:
+   ```bash
+   python check_dnt.py --ref <source.file> --hyp <target.file>
+   ```
 
 

@@ -158,11 +158,10 @@ def dnt_augment(sentence1: str,
     replacements = { re.escape(el): el + " ${DNT0}" + str(to_sample.pop()) for el in dnt_tags }
     
     for old, new in replacements.items():
-        if augment_percent is not None:
-            current_prob = random.random()
-            if current_prob > augment_percent:
-                res1 = re.sub(old, new, res1)
-                res2 = re.sub(old, new, res2)
+        current_prob = random.random()
+        if augment_percent > 0 and current_prob > augment_percent:
+            res1 = re.sub(old, new, res1)
+            res2 = re.sub(old, new, res2)
     
     return res1, res2 
 
@@ -350,7 +349,7 @@ def make_dnt_BIO(src_sentence, src_origin, trg_sentence, trg_origin, alignments,
     
     # ====== DNTS AUGMENTING ======= #
     if "{DNT0}" in src_res:
-        if augment_prob is not None:
+        if augment_prob > 0:
             src_res, trg_res = dnt_augment(src_res, trg_res, augment_prob, to_sample)
         src_res = src_origin + src_res
         trg_res = trg_origin + trg_res
@@ -447,5 +446,5 @@ if __name__ == "__main__":
          args.target, 
          args.alignents,
          (1 - float(args.probability)) if args.probability else .0, 
-         (1 - float(args.augment)) if args.augment else 1, 
+         (1 - float(args.augment)) if args.augment else 0, 
          args.verbosity)

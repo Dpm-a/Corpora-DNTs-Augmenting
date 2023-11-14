@@ -1,10 +1,17 @@
 # Parallel Dataset creation with DNTs (Do Not Translate) terms
 
-# Documentation
+In Neural Machine Translation (NMT) projects, it may be the case one wants to return given parts of the text untraslated. These may include names, alpha-numeric codes, bigger blocks of text that for whatever reason must remain the same during inference. There's not really any straightforward solution to address this problem since current Transfromers architectures can't deal with this directly.
+
+This repo works around this issue and provides a pipeline to create specific parallel corpora to feed any NMT engine with entity-augmented data, aiming to teach the engine to return given Do-Not-Translate tags back to be subsequently attached to the original entities.
+Thus, in a real case scenario we will have **Test Data** (any given document) in which there are specific parts we (again) don't want to be translated. Thus we will backup and convert these parts manually to the same tags this repository is going to augment in the training data, so that once the document is translated we can map back the original entities surrounded by corectly translated words.
+
+While in this process natural-sense is mantained at sentence level, we replace an arbitrary amount of matching entities in **Training parallel corpora** with a special token `${DNT0}X` (where the prefix is just a tag and `x` stands for an arbitrary number for enumeration purposes) to let the MT engine learn for that and return those untouched, while inferencing on Test data.
 
 In order to tag our parallel dataset we are going to use different tools which are used to both align and tag sentences and finally return a corpora with `${DNT0}X` tags replacing selected entities.
 
-# Usage
+This pipeline is mostly suitable for Latin, Arabic and Cyrillc alphabeth languages, while for different alphabeths (Cinese, Nepalese etc) it has been shown [`here`](https://github.com/Dpm-a/Corpora-DNTs-Augmenting/blob/main/MasterThesis.pdf) that it struggles, mostly with respect to the tagging phase discussed soon.
+
+# Documentation
 
 It is recommended installing a fresh Conda environment and run python 3.8.
 
